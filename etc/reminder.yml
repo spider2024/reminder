@@ -1,0 +1,9 @@
+zenTao:
+  user_name: ${ZEN_TAO_USERNAME}
+  password: ${ZEN_TAO_PASSWORD}
+  url: ${ZEN_TAO_URL}
+
+redis:
+  password: Rds_7023_cn
+  addr: 8.142.38.6
+  db: 0
