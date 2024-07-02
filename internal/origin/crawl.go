@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 	"io"
 	"net/http"
 	"reminder/etc"
@@ -23,12 +24,15 @@ const (
 )
 
 func sessionKeeper(ctx context.Context) (string, error) {
-	userId, err := etc.Rdb.Get(ctx, sessionKey).Result()
-	if err != nil {
+	token, err := etc.Rdb.Get(ctx, sessionKey).Result()
+	if errors.Is(err, redis.Nil) {
+		fmt.Printf("Key:%s does not exist\n", sessionKey)
+	} else if err != nil {
+		fmt.Printf("login-fail:%s\n", err)
 		return "", err
 	}
-	if userId != "" {
-		return userId, err
+	if token != "" {
+		return token, err
 	}
 	// get sessionId
 	resp, err := http.Get(url + "/api-getsessionid.json ")
@@ -56,16 +60,23 @@ func Login(ctx context.Context, username, password string) (userId string, token
 		return "", "", err
 	}
 	userId, err = etc.Rdb.Get(ctx, userKey).Result()
-	if err != nil {
+	if errors.Is(err, redis.Nil) {
+		fmt.Printf("Key:%s does not exist\n", userKey)
+	} else if err != nil {
 		return "", "", err
 	}
 	if userId != "" {
 		return userId, token, nil
 	}
-	return login(ctx, username, password)
+	userId, err = login(ctx, username, password, token)
+	if err != nil {
+		fmt.Printf("log.fail:%s\n", err)
+		return "", "", err
+	}
+	return userId, token, nil
 }
 
-func login(ctx context.Context, username, password string) (userId string, token string, err error) {
+func login(ctx context.Context, username, password, token string) (userId string, err error) {
 	usernameDone := strings.Replace(loginUrl, "{0}", username, 1)
 	passwordDone := strings.Replace(usernameDone, "{1}", password, 1)
 	realUrl := strings.Replace(passwordDone, "{2}", token, 1)
@@ -78,28 +89,28 @@ func login(ctx context.Context, username, password string) (userId string, token
 		}
 	}(getUserInfoResp.Body)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	readAll, err := io.ReadAll(getUserInfoResp.Body)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	var m map[string]any
 
 	if err := json.Unmarshal(readAll, &m); err != nil {
 		fmt.Println("Error:", err)
-		return "", "", err
+		return "", err
 	}
 	userMap, ok := m["user"].(map[string]any)
 	if !ok {
-		return "", "", errors.New("user not return")
+		return "", errors.New("user not return")
 	} else {
 		id, ok := userMap["id"].(string)
 		if !ok {
-			return "", "", errors.New("id not return")
+			return "", errors.New("id not return")
 		} else {
 			etc.Rdb.Set(ctx, sessionKey, id, time.Hour*8)
-			return id, token, nil
+			return id, nil
 		}
 	}
 }
@@ -110,7 +121,13 @@ type BugView struct {
 	severity   int
 	url        string
 	appendDate string
-	//	assignedTo
+	assignedTo AssignedTo
+	status     string //active
+}
+
+type AssignedTo struct {
+	id      int
+	account string
 }
 
 // Bugs search bugs in project which
@@ -137,8 +154,23 @@ func Bugs(token, projectId, userId string) error {
 		fmt.Println("Error reading response body:", err)
 		return nil
 	}
+	bugs := make(map[string]any)
+	err = json.Unmarshal(body, &bugs)
+	if err != nil {
+		fmt.Printf("parse bugs error: %v\n", err)
+		return err
+	}
+	bugList, ok := bugs["bugs"].([]BugView)
+	if !ok {
 
-	fmt.Printf(string(body))
+	}
+	for _, bug := range bugList {
+		if string(rune(bug.assignedTo.id)) == userId {
+			fmt.Printf("%d,%s,%s", bug.assignedTo.id, bug.assignedTo.account, bug.title)
+		} else {
+			fmt.Printf("%d,%s", bug.assignedTo.id, bug.title)
+		}
+	}
 	//severity
 	return nil
 }

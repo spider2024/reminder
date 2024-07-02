@@ -1,9 +1,9 @@
-zenTao:
+ZenTao:
   user_name: ${ZEN_TAO_USERNAME}
   password: ${ZEN_TAO_PASSWORD}
   url: ${ZEN_TAO_URL}
 
-redis:
-  password: Rds_7023_cn
-  addr: 8.142.38.6
+Redis:
+  addr: ${UPSTASH_REDIS_REST_URL}
+  password: ${UPSTASH_REDIS_REST_TOKEN}
   db: 0

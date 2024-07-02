@@ -2,13 +2,14 @@ package etc
 
 import "github.com/redis/go-redis/v9"
 
-var AppConfig *Config
 var Rdb *redis.Client
 
+var AppConfig Config
+
 type Config struct {
-	Redis   *RedisCnf
-	ZenTao  *ZenTaoCnf
-	Project *Project
+	Redis   RedisCnf
+	ZenTao  ZenTaoCnf
+	Project Project
 }
 
 type RedisCnf struct {
