@@ -1,0 +1,9 @@
+zen_tao:
+  user_name: "${ZEN_TAO_USERNAME}"
+  password: "${ZEN_TAO_PASSWORD}"
+  url: "${ZEN_TAO_URL}"
+
+redis:
+  addr: "${UPSTASH_REDIS_REST_URL}"
+  password: "${UPSTASH_REDIS_REST_TOKEN}"
+  db: 0

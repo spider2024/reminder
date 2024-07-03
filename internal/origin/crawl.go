@@ -82,16 +82,17 @@ func login(ctx context.Context, username, password, token string) (userId string
 	realUrl := strings.Replace(passwordDone, "{2}", token, 1)
 
 	getUserInfoResp, err := http.Get(realUrl)
+	body := getUserInfoResp.Body
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
 			fmt.Printf("close getUserInfo error: %v\n", err)
 		}
-	}(getUserInfoResp.Body)
+	}(body)
 	if err != nil {
 		return "", err
 	}
-	readAll, err := io.ReadAll(getUserInfoResp.Body)
+	readAll, err := io.ReadAll(body)
 	if err != nil {
 		return "", err
 	}
