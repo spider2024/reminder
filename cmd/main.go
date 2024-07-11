@@ -5,29 +5,31 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
-	"log"
 	"os"
 	"reminder/etc"
+	"reminder/internal/logger"
 	"reminder/internal/origin"
 	"strings"
 )
 
 func main() {
 	ctx := context.Background()
-	userId, token, err := origin.Login(ctx, "", "")
+	userId, token, err := origin.Login(ctx, etc.AppConfig.ZenTao.UserName, etc.AppConfig.ZenTao.Password)
 	if err != nil {
-		fmt.Printf("login failed: %v", err)
+		logger.Log.ErrorF("login failed: %v", err)
 		return
 	}
 	err = origin.Bugs(token, "16", userId)
 	if err != nil {
-		fmt.Printf("bugs:%+v\n", err)
+		logger.Log.ErrorF("bugs:%+v\n", err)
 		return
 	}
-	fmt.Println(token)
+	logger.Log.InfoF(token)
 }
 
 func init() {
+	logSet()
+
 	// Set the file name of the configuration file
 	viper.SetConfigName("reminder")
 
@@ -45,17 +47,15 @@ func init() {
 
 	// Read the configuration file
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file, %s\n", err)
+		logger.Log.ErrorF("Error reading config file, %s\n", err)
 	}
 
-	if err := viper.Unmarshal(&etc.AppConfig); err != nil {
+	fmt.Printf("%+v\n", etc.AppConfig)
+	if err := viper.Unmarshal(etc.AppConfig); err != nil {
 		fmt.Printf("Error unmarshal config file, %s\n", err)
 		return
 	}
-	replaceEnvVariables(&etc.AppConfig)
-
-	fmt.Printf("ZenTao Config: %+v\n", etc.AppConfig.ZenTao)
-	fmt.Printf("Redis Config: %+v\n", etc.AppConfig.Redis)
+	replaceEnvVariables(etc.AppConfig)
 
 	opt, err := redis.ParseURL("rediss://default:" + etc.AppConfig.Redis.Password + "@" + etc.AppConfig.Redis.Addr)
 	if err != nil {
@@ -72,6 +72,22 @@ func init() {
 	fmt.Printf("redis.test:%s\n", ping.String())
 }
 
+func logSet() {
+	logFile, err := os.OpenFile("application.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		logger.Log.FatalF("无法打开日志文件: %v", err)
+	}
+	defer func(logFile *os.File) {
+		err := logFile.Close()
+		if err != nil {
+			logger.Log.ErrorF("close file failed: %v", err)
+		}
+	}(logFile)
+
+	// 创建自定义Logger，日志输出到控制台和文件
+	logger.Log = logger.NewLogger(logger.INFO, os.Stdout, logFile)
+}
+
 func replaceEnvVariables(config *etc.Config) {
 	// Replace Redis config environment variables
 	config.Redis.Addr = os.ExpandEnv(config.Redis.Addr)
@@ -82,7 +98,4 @@ func replaceEnvVariables(config *etc.Config) {
 	config.ZenTao.Password = os.ExpandEnv(config.ZenTao.Password)
 	config.ZenTao.Url = os.ExpandEnv(config.ZenTao.Url)
 
-	// Replace Project config environment variables if any
-	// config.Project.ProjectName = os.ExpandEnv(config.Project.ProjectName)
-	// config.Project.Id = os.ExpandEnv(config.Project.Id)
 }

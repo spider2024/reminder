@@ -1,7 +1,7 @@
 zen_tao:
   user_name: "${ZEN_TAO_USERNAME}"
   password: "${ZEN_TAO_PASSWORD}"
-  url: "${ZEN_TAO_URL}"
+  url: "${e}"
 
 redis:
   addr: "${UPSTASH_REDIS_REST_URL}"

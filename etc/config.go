@@ -1,10 +1,12 @@
 package etc
 
-import "github.com/redis/go-redis/v9"
+import (
+	"github.com/redis/go-redis/v9"
+)
 
 var Rdb *redis.Client
 
-var AppConfig Config
+var AppConfig = &Config{}
 
 type Config struct {
 	Redis   RedisCnf  `yaml:"redis"`
