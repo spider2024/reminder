@@ -9,9 +9,10 @@ var Rdb *redis.Client
 var AppConfig = &Config{}
 
 type Config struct {
-	Redis   RedisCnf  `yaml:"redis"`
-	ZenTao  ZenTaoCnf `yaml:"zen_tao"`
-	Project Project   `yaml:"project"`
+	Redis   RedisCnf   `yaml:"redis"`
+	ZenTao  ZenTaoCnf  `yaml:"zenTao"`
+	Project Project    `yaml:"project"`
+	Server  ServerConf `yaml:"server"`
 }
 
 type RedisCnf struct {
@@ -21,13 +22,20 @@ type RedisCnf struct {
 }
 
 type ZenTaoCnf struct {
-	UserName string `yaml:"user_name"`
+	UserName string `yaml:"userName"`
 	Password string `yaml:"password"`
 	Url      string `yaml:"url"`
 }
 
 type Project struct {
-	ProjectName string `yaml:"project_name"`
+	ProjectName string `yaml:"projectName"`
 	Id          string `yaml:"id"`
 	Weight      int    `yaml:"weight" default:"0"`
+}
+
+type ServerConf struct {
+	LogPath  string `yaml:"logPath"`
+	LogName  string `yaml:"logName"`
+	LogExt   string `yaml:"logExt"`
+	LogLevel string `yaml:"logLevel"`
 }
