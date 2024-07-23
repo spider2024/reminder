@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"io"
 	"net/http"
 	"reminder/etc"
@@ -25,20 +24,24 @@ const (
 )
 
 func sessionKeeper(ctx context.Context) (string, error) {
-	token, err := etc.Rdb.Get(ctx, sessionKey).Result()
-	if errors.Is(err, redis.Nil) {
-		logger.InfoF("Key:%s does not exist\n", sessionKey)
-	} else if err != nil {
-		logger.ErrorF("loggerin-fail:%s\n", err)
-		return "", err
-	}
-	if token != "" {
-		return token, err
-	}
+	//token, err := etc.Rdb.Get(ctx, sessionKey).Result()
+	//if errors.Is(err, redis.Nil) {
+	//	logger.InfoF("Key:%s does not exist\n", sessionKey)
+	//} else if err != nil {
+	//	logger.ErrorF("loggerin-fail:%s\n", err)
+	//	return "", err
+	//}
+	//if token != "" {
+	//	return token, err
+	//}
 	// get sessionId
 	resp, err := http.Get(etc.AppConfig.ZenTao.Url + sessionUrl)
 	if err != nil {
 		return "", err
+	}
+	if 200 != resp.StatusCode {
+		logger.ErrorF("session-request-fail:%s", resp.Status)
+		return "", errors.New(resp.Status)
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -68,7 +71,7 @@ func sessionKeeper(ctx context.Context) (string, error) {
 		return "", err
 	}
 	sessionID := dataMap["sessionID"].(string)
-	etc.Rdb.Set(ctx, sessionKey, sessionID, time.Hour*8)
+	//etc.Rdb.Set(ctx, sessionKey, sessionID, time.Hour*8)
 	return sessionID, nil
 }
 
@@ -77,16 +80,16 @@ func Login(ctx context.Context, username, password string) (userId string, token
 	if err != nil {
 		return "", "", err
 	}
-	userId, err = etc.Rdb.Get(ctx, userKey).Result()
-	if errors.Is(err, redis.Nil) {
-		logger.InfoF("Key:%s does not exist\n", userKey)
-	} else if err != nil {
-		return "", "", err
-	}
-	if userId != "" {
-		return userId, token, nil
-	}
-	userId, err = login(ctx, username, password, token)
+	//userId, err = etc.Rdb.Get(ctx, userKey).Result()
+	//if errors.Is(err, redis.Nil) {
+	//	logger.InfoF("Key:%s does not exist\n", userKey)
+	//} else if err != nil {
+	//	return "", "", err
+	//}
+	//if userId != "" {
+	//	return userId, token, nil
+	//}
+	userId, err = login(username, password, token)
 	if err != nil {
 		logger.ErrorF("login.fail:%s", err)
 		return "", "", err
@@ -94,11 +97,15 @@ func Login(ctx context.Context, username, password string) (userId string, token
 	return userId, token, nil
 }
 
-func login(ctx context.Context, username, password, token string) (userId string, err error) {
+func login(username, password, token string) (userId string, err error) {
 	usernameDone := strings.Replace(etc.AppConfig.ZenTao.Url+loginUrl, "{0}", username, 1)
 	passwordDone := strings.Replace(usernameDone, "{1}", password, 1)
 	realUrl := strings.Replace(passwordDone, "{2}", token, 1)
 	getUserInfoResp, err := http.Get(realUrl)
+	if 200 != getUserInfoResp.StatusCode {
+		logger.FatalF("login-fail:%s", getUserInfoResp.Status)
+		return "", errors.New(getUserInfoResp.Status)
+	}
 	body := getUserInfoResp.Body
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -128,7 +135,7 @@ func login(ctx context.Context, username, password, token string) (userId string
 		if !ok {
 			return "", errors.New("id not return")
 		} else {
-			etc.Rdb.Set(ctx, userKey, id, time.Hour*8)
+			//etc.Rdb.Set(ctx, userKey, id, time.Hour*8)
 			return id, nil
 		}
 	}
@@ -166,7 +173,11 @@ func Bugs(token, projectId, userId string) error {
 	client := &http.Client{}
 	do, err := client.Do(request)
 	if err != nil {
+		logger.ErrorF("get bugs error: %v\n", err)
 		return err
+	}
+	if do.StatusCode != 200 {
+		logger.ErrorF("get bugs error httpStatus:%s", do.Status)
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -174,6 +185,7 @@ func Bugs(token, projectId, userId string) error {
 			logger.ErrorF("close bugs error: %v\n", err)
 		}
 	}(do.Body)
+
 	body, err := io.ReadAll(do.Body)
 	if err != nil {
 		logger.ErrorF("Error reading response body:", err)
@@ -184,15 +196,24 @@ func Bugs(token, projectId, userId string) error {
 	err = json.Unmarshal(body, &bugsList)
 	if err != nil {
 		logger.ErrorF("parse bugs resp error: %v\n", err)
-		return err
+		return errors.New("parse bugs resp error:" + err.Error())
+	}
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		logger.ErrorF("failed to load location: %v", err)
+		return errors.New("loadLocation err:" + err.Error())
 	}
 	for _, bug := range bugsList.Bugs {
-		if fmt.Sprintf("%s", bug.AssignedTo.Id) == userId {
-			logger.InfoF("bugId:%d,account:%s,title:%s,openedDate:%s,status:%s", bug.AssignedTo.Id, bug.AssignedTo.Account, bug.Title, bug.OpenedDate, bug.Status)
+		if bug.Status != "active" {
+			continue
+		}
+		if bug.AssignedTo.Id == 0 {
+			logger.InfoF("new bugs have no assigned:%d,%s,open at %s ", bug.Id, bug.Title, bug.OpenedDate)
+		}
+		if fmt.Sprintf("%d", bug.AssignedTo.Id) == userId {
+			logger.InfoF("bugId:%d,account:%s,title:%s,status:%s,openedDate:%s", bug.AssignedTo.Id, bug.AssignedTo.Account, bug.Title, bug.Status, bug.OpenedDate.In(location).Format(time.DateTime))
 		} else {
-			sprintf := fmt.Sprintf("bugId:%d,account:%s,title:%s,openedDate:%s,status:%s", bug.AssignedTo.Id, bug.AssignedTo.Account, bug.Title, bug.OpenedDate, bug.Status)
-			logger.InfoF(sprintf)
-			logger.InfoF("bugId:%d,account:%s,title:%s,openedDate:%s,status:%s", bug.AssignedTo.Id, bug.AssignedTo.Account, bug.Title, bug.OpenedDate, bug.Status)
+			logger.InfoF("bugId:%d,title:%s,%d,skip...", bug.AssignedTo.Id, bug.Title, bug.AssignedTo.Id)
 		}
 	}
 	//severity

@@ -18,12 +18,12 @@ func main() {
 		logger.ErrorF("login failed: %v", err)
 		return
 	}
-	err = origin.Bugs(token, "16", userId)
+
+	err = origin.Bugs(token, "53", userId)
 	if err != nil {
 		logger.ErrorF("bugs:%+v\n", err)
 		return
 	}
-	logger.InfoF(token)
 }
 
 func init() {
@@ -42,7 +42,7 @@ func init() {
 	}
 	replaceEnvVariables(etc.AppConfig)
 
-	logger.Log = logger.NewLogger(logger.INFO, os.Stdout, logger.OpenLogFile())
+	logger.InitLogger(os.Stdout, logger.OpenLogFile())
 	logger.InfoF("server config: %+v", *etc.AppConfig)
 
 	opt, err := redis.ParseURL("rediss://default:" + etc.AppConfig.Redis.Password + "@" + etc.AppConfig.Redis.Addr)

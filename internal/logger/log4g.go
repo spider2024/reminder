@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var Log *Lcg
+var Log *Log4g
 
 type Level int
 
@@ -29,7 +29,7 @@ var logLevels = []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 
 var levelMap = map[string]Level{"INFO": INFO, "WARN": WARN, "ERROR": ERROR, "FATAL": FATAL}
 
-type Lcg struct {
+type Log4g struct {
 	level  Level
 	logger *log.Logger
 }
@@ -40,8 +40,7 @@ func getLogFilePath() string {
 
 func getLogFileFullPath() string {
 	prefixPath := getLogFilePath()
-	suffixPath := fmt.Sprintf("%s%s.%s", time.Now().Format(time.DateOnly), etc.AppConfig.Server.LogName, etc.AppConfig.Server.LogExt)
-	fmt.Printf("suffixPath: %s", etc.AppConfig.Server.LogExt)
+	suffixPath := fmt.Sprintf("%s-%s.%s", time.Now().Format(time.DateOnly), etc.AppConfig.Server.LogName, etc.AppConfig.Server.LogExt)
 	return fmt.Sprintf("%s%s", prefixPath, suffixPath)
 }
 
@@ -70,11 +69,10 @@ func mkDir() {
 	}
 }
 
-func NewLogger(level Level, writers ...io.Writer) *Lcg {
-	multiWriter := io.MultiWriter(writers...)
-	return &Lcg{
-		level:  level,
-		logger: log.New(multiWriter, "", log.LstdFlags),
+func InitLogger(writers ...io.Writer) {
+	Log = &Log4g{
+		level:  INFO,
+		logger: log.New(io.MultiWriter(writers...), "", log.LstdFlags),
 	}
 }
 
@@ -88,13 +86,13 @@ func lg(level Level, msg string) {
 		v = INFO
 	}
 	if level >= v {
-		_, file, line, ok := runtime.Caller(3)
+		_, file, line, ok := runtime.Caller(2)
 		if ok {
 			Log.logger.SetPrefix(fmt.Sprintf("[%s][%s:%d]", logLevels[level], filepath.Base(file), line))
 		} else {
 			Log.logger.SetPrefix(fmt.Sprintf("[%s]", logLevels[level]))
 		}
-		_ = Log.logger.Output(3, msg)
+		_ = Log.logger.Output(2, msg)
 	}
 }
 
@@ -111,7 +109,7 @@ func Info(msg string) {
 }
 
 func InfoF(format string, args ...any) {
-	lg(INFO, fmt.Sprintf(format, args))
+	lg(INFO, fmt.Sprintf(format, args...))
 }
 
 func Warn(msg string) {
